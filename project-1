@@ -1,0 +1,39 @@
+text
+import requests
+def get_traffic_data(start, end):
+    # Call the traffic API to fetch real-time data
+    api_key = " yU4lMZH7wc1F1qbNVFhmaGGSVuQ46rPi "
+    url = f"https://maps.googleapis.com/maps/api/directions/json?origin={start}&destination={end}&key={api_key}"
+    response = requests.get(url)
+    data = response.json()
+
+    # Extract relevant traffic information
+    current_traffic = data["routes"][0]["legs"][0]["duration_in_traffic"]["text"]
+    estimated_travel_time = data["routes"][0]["legs"][0]["duration"]["text"]
+    alternative_routes = []
+    for route in data["routes"]:
+        alt_route = {
+            "distance": route["legs"][0]["distance"]["text"],
+            "duration": route["legs"][0]["duration"]["text"],
+            "duration_in_traffic": route["legs"][0]["duration_in_traffic"]["text"]
+        }
+        alternative_routes.append(alt_route)
+
+    return current_traffic, estimated_travel_time, alternative_routes
+
+def display_traffic_info(current_traffic, estimated_travel_time, alternative_routes):
+    print(f"Current traffic conditions: {current_traffic}")
+    print(f"Estimated travel time: {estimated_travel_time}")
+    print("Alternative routes:")
+    for route in alternative_routes:
+        print(f"- Distance: {route['distance']}, Duration: {route['duration']}, Duration in traffic: {route['duration_in_traffic']}")
+
+def main():
+    start = input("Enter your starting point: ")
+    end = input("Enter your destination: ")
+
+    current_traffic, estimated_travel_time, alternative_routes = get_traffic_data(start, end)
+    display_traffic_info(current_traffic, estimated_travel_time, alternative_routes)
+
+if _name_ == "_main_":
+    main()
