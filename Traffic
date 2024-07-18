@@ -1,39 +1,64 @@
-text
-import requests
-def get_traffic_data(start, end):
-    # Call the traffic API to fetch real-time data
-    api_key = " yU4lMZH7wc1F1qbNVFhmaGGSVuQ46rPi "
-    url = f"https://maps.googleapis.com/maps/api/directions/json?origin={start}&destination={end}&key={api_key}"
-    response = requests.get(url)
-    data = response.json()
+import socket
+import time
+import json
 
-    # Extract relevant traffic information
-    current_traffic = data["routes"][0]["legs"][0]["duration_in_traffic"]["text"]
-    estimated_travel_time = data["routes"][0]["legs"][0]["duration"]["text"]
-    alternative_routes = []
-    for route in data["routes"]:
-        alt_route = {
-            "distance": route["legs"][0]["distance"]["text"],
-            "duration": route["legs"][0]["duration"]["text"],
-            "duration_in_traffic": route["legs"][0]["duration_in_traffic"]["text"]
-        }
-        alternative_routes.append(alt_route)
+def get_user_input():
+    start_point = input("Enter starting point: ")
+    destination = input("Enter destination: ")
+    return start_point, destination
 
-    return current_traffic, estimated_travel_time, alternative_routes
+def send_api_request(start_point, destination, api_key):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect(("maps.googleapis.com", 443))
+    request = f"GET /maps/api/directions/json?origin={start_point}&destination={destination}&key={api_key}&traffic_model=best_guess HTTP/1.1\r\nHost: maps.googleapis.com\r\n\r\n"
+    sock.sendall(request.encode())
+    response = b""
+    while True:
+        data = sock.recv(1024)
+        if not data:
+            break
+        response += data
+    sock.close()
+    
+    # Split the response into headers and body
+    response_parts = response.decode().split("\r\n\r\n", 1)
+    
+    # Check the response status code
+    status_code = int(response_parts[0].split("\r\n")[0].split(" ")[1])
+    if status_code == 200:
+        return json.loads(response_parts[1])
+    else:
+        raise Exception(f"API request failed with status code {status_code}")
 
-def display_traffic_info(current_traffic, estimated_travel_time, alternative_routes):
-    print(f"Current traffic conditions: {current_traffic}")
-    print(f"Estimated travel time: {estimated_travel_time}")
-    print("Alternative routes:")
-    for route in alternative_routes:
-        print(f"- Distance: {route['distance']}, Duration: {route['duration']}, Duration in traffic: {route['duration_in_traffic']}")
+def display_traffic_data(traffic_data):
+    if "routes" in traffic_data:
+        for route in traffic_data["routes"]:
+            for leg in route["legs"]:
+                print(f"Route: {leg['start_address']} to {leg['end_address']}")
+                print(f"Estimated Travel Time: {leg['duration']['text']}")
+                for step in leg["steps"]:
+                    print(f"Step: {step['html_instructions']}")
+                    if "traffic_speed_entry" in step:
+                        print(f"Traffic Speed: {step['traffic_speed_entry']['speed']} km/h")
+                        if step['traffic_speed_entry']['congestion'] == True:
+                            print("Congestion Detected")
+                    print()
+    else:
+        print("Error: Unable to fetch traffic data.")
 
 def main():
-    start = input("Enter your starting point: ")
-    end = input("Enter your destination: ")
+    api_key = "YOUR_API_KEY"
 
-    current_traffic, estimated_travel_time, alternative_routes = get_traffic_data(start, end)
-    display_traffic_info(current_traffic, estimated_travel_time, alternative_routes)
+    while True:
+        start_point, destination = get_user_input()
+        try:
+            traffic_data = send_api_request(start_point, destination, api_key)
+            display_traffic_data(traffic_data)
+        except Exception as e:
+            print(f"Error: {e}")
+        print(f"Last updated: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print()
+        input("Press Enter to continue...")
 
-if _name_ == "_main_":
+if __name__ == "__main__":
     main()
